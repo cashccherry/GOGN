@@ -155,7 +155,7 @@ def CG(
 
     if torch.dot(search_direction, grad) > 0:
       with torch.no_grad():
-        search_direction = -conjugate_gradient(lambda m : D(D(m)) + h * m, grad.clone(), tol=.005, maxiter=10000)[0]
+        search_direction = -conjugate_gradient(lambda m : D(D(m)) + h * m, grad.clone(), tol=.005, max_iter=10000)[0]
       gamma *= 0
 
     search_direction.requires_grad_(False)
@@ -436,17 +436,17 @@ if __name__ == "__main__":
   #old test of cg
   print("TESTING CG")
   f              = doubleRosenbrock.Sum()
-  parameters     = optParams(maxiter = 1000, maxstep=10, targetx = torch.ones(4), ltol = 1e-3)
+  parameters     = optParams(maxiter = 1000, maxstep=4000, targetx = torch.ones(4), ltol = 1e-3)
   x0             = -torch.ones(4) 
-  xstar, history = CG(f, x0, parameters)
+  xstar, history = CG(f, x0, parameters, D = lambda x : x*0)
   print(history.report)
   print(xstar)
 
   print("TESTING LBFGS")
   f              = doubleRosenbrock.Sum()
-  parameters     = optParams(maxiter = 1000, maxstep=10, targetx = torch.ones(4), ltol = 1e-3)
+  parameters     = optParams(maxiter = 1000, maxstep=4000, targetx = torch.ones(4), ltol = 1e-3)
   x0             = -torch.ones(4) 
-  xstar, history, bfgshistory, _ = LBFGS(f, x0, parameters, bfgsMemory = 5)
+  xstar, history, bfgshistory, _ = LBFGS(f, x0, parameters, D = lambda x : x*0, bfgsMemory = 5)
   print(history.report)
   print(xstar)
 
@@ -454,7 +454,7 @@ if __name__ == "__main__":
   f              = doubleRosenbrock.Separate()
   parameters     = optParams(maxiter = 10, maxstep=10, targetx = torch.ones(4), ltol = 1e-3)
   x0             = -torch.ones(4) 
-  xstar, history = GN(f, x0, parameters, line_search = line_search_backtrack)
+  xstar, history = GN(f, x0, parameters, D = lambda x : x*0, line_search = line_search_backtrack)
   print(history.report)
   print(xstar)
 
@@ -462,7 +462,7 @@ if __name__ == "__main__":
   f              = doubleRosenbrock.Separate()
   parameters     = optParams(maxiter = 10, maxstep=10, targetx = torch.ones(4), ltol = 1e-3)
   x0             = -torch.ones(4) 
-  xstar, history = GNCG(f, x0, parameters, line_search = line_search_backtrack)
+  xstar, history = GNCG(f, x0, parameters, D = lambda x : x*0, line_search = line_search_backtrack)
   print(history.report)
   print(xstar)
 
