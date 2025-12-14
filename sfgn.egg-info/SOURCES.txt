@@ -1,0 +1,14 @@
+README.md
+setup.py
+sfgn/__init__.py
+sfgn.egg-info/PKG-INFO
+sfgn.egg-info/SOURCES.txt
+sfgn.egg-info/dependency_links.txt
+sfgn.egg-info/top_level.txt
+sfgn/objectives/FWI.py
+sfgn/objectives/__init__.py
+sfgn/objectives/doubleRosenbrock.py
+sfgn/objectives/utils.py
+sfgn/optimization/__init__.py
+sfgn/optimization/nonlinear.py
+sfgn/optimization/utils.py
