@@ -4,7 +4,6 @@ from sfgn.objectives.doubleRosenbrock import Separate
 import concurrent.futures
 
 
-
 def gnHessProd(residual: Callable[[torch.Tensor], torch.Tensor], input: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
   """Compute product with the Gauss-Newton Hessian J.T J of the residual"""
   input = input.detach()

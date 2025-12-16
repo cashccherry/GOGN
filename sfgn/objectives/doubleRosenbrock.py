@@ -26,6 +26,15 @@ class Separate(nn.Module):
     self.backward_counter += 1
     return grad
 
+class SingleSep(Separate):
+  def __init__(self, index: int):
+    super().__init__()
+    self.index = index
+
+  def forward(self, x):
+    outputs = super().forward(x)
+    return outputs[self.index]
+
 class Sum(nn.Module):
   def __init__(self):
     super().__init__()
@@ -98,6 +107,22 @@ if __name__ == "__main__":
   assert torch.equal(torch.autograd.functional.jacobian(separate, xmin), torch.zeros(4,4)) # Assert correct Jacobian at minimizer
   assert separate.forward_counter == 2 # We have computed two forward passes
   assert separate.backward_counter == 4 # We have computed four backward passes
+  del separate
+  print("SEPARATE OBJECTIVES PASSED")
+
+  print(20*"-")
+
+  print("TESTING SINGLE SEPARATE OBJECTIVES")
+  xmin  = torch.ones(4)
+  xmin.requires_grad_()
+  separate = SingleSep(2)
+  assert separate.forward_counter == 0 # We have computed no forward passes
+  assert torch.equal(separate(xmin), torch.tensor(0.)) # Assert minimizer has value 0
+  assert separate.forward_counter == 1 # We have computed one forward pass
+  assert separate.backward_counter  == 0 # We have computed no backward pass yet
+  assert torch.equal(torch.autograd.functional.jacobian(separate, xmin), torch.zeros(4)) # Assert correct Jacobian at minimizer
+  assert separate.forward_counter == 2 # We have computed two forward passes
+  assert separate.backward_counter == 1 # We have computed four backward passes
   del separate
   print("SEPARATE OBJECTIVES PASSED")
 

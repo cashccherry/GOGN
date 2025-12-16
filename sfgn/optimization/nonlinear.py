@@ -3,6 +3,7 @@ import torch
 import time
 from sfgn.optimization.utils import line_search_backtrack, line_search_interpolate, lbfgs_invhess, bfgsHistory, conjugate_gradient
 from dataclasses import dataclass, field
+from scipy.sparse.linalg import LinearOperator, eigsh
 
 from sfgn.objectives       import doubleRosenbrock
 from sfgn.objectives.utils import jacobian_with_output, parallel_jacobian, gnHessProd
@@ -225,7 +226,7 @@ def LBFGS(
 
     if torch.dot(search_direction, grad) > 0:
       with torch.no_grad():
-        search_direction = -conjugate_gradient(lambda m : D(D(m)) + h * m, grad.clone(), tol=.005, maxiter=10000)[0]
+        search_direction = -conjugate_gradient(lambda m : D(D(m)) + h * m, grad.clone(), tol=.005, max_iter=10000)[0]
 
     search_direction.requires_grad_(False)
 
@@ -255,8 +256,8 @@ def LBFGS(
     history.update(float(loss), float(torch.linalg.norm(grad)), parameters.targetDist(x), f.forward_counter, f.backward_counter)
   return x, history, bfgsHist, phiHist
 
-def GN( 
-  residual: Callable[[torch.Tensor], torch.Tensor], 
+def SFGN( 
+  fs: Callable[[torch.Tensor], torch.Tensor], 
   x0: torch.Tensor,
   parameters: optParams, 
   D: Callable[[torch.Tensor], torch.Tensor] = lambda x : x,
@@ -268,25 +269,27 @@ def GN(
      torch.Tensor, torch.Tensor, 
      float, float,  int, bool], 
     Tuple[float, torch.Tensor, torch.Tensor]] = line_search_interpolate,
-  print_debug: bool = True
+  print_debug: bool = True 
   ) -> Tuple[torch.Tensor, optHist]:
-  """GN Implementation"""
+  """SFGN Implementation"""
   if h is None:
     h = torch.ones_like(x0) 
 
   if m0 is None:
     m0 = x0.clone().detach()
 
-  def preconditioner(g):
-    with torch.no_grad():
-      out = -conjugate_gradient(lambda m : D(D(m)) + h * m, g.clone(), tol=.005, max_iter=10000)[0]
-    return out
+  prec = conjugate_gradient(lambda m : D(D(m)), h, tol=.005, max_iter=10000)[0]
+
+  #def preconditioner(g):
+  #  with torch.no_grad():
+  #    out = h**-1 * g#conjugate_gradient(lambda m : D(D(m)) + h * m, g.clone(), tol=.005, max_iter=100)[0]
+  #  return out
 
   history    = optHist()
   x          = x0.clone()
   x.requires_grad_()
 
-  Jac, res = jacobian_with_output(residual, x)
+  Jac, res = parallel_jacobian(fs, x)
 
   loss = .5 * torch.linalg.norm(res)**2 + .5 * torch.linalg.norm(D(x.clone() - m0))**2
   grad = Jac.T @ res  
@@ -294,7 +297,7 @@ def GN(
   loss = loss.detach()
   grad = grad.detach()
 
-  history.update(float(loss), float(torch.linalg.norm(grad)), parameters.targetDist(x), residual.forward_counter, residual.backward_counter)
+  history.update(float(loss), float(torch.linalg.norm(grad)), parameters.targetDist(x), fs[0].forward_counter, fs[0].backward_counter)
 
   while not history.checkConverged(parameters):
     if print_debug:
@@ -305,14 +308,26 @@ def GN(
       print(history.gradnorm[-1])
       print(torch.linalg.norm(grad))
 
-    search_direction, prev_solve_rnorm = conjugate_gradient(lambda v : Jac.T@(Jac@v) + D(D(v)), -grad, M=lambda m:preconditioner(m), print_debug=print_debug, tol = cgtol)
-    search_direction = search_direction
+
+#   Jacadj = torch.stack([conjugate_gradient(lambda v : D(D(v)), Jac[i,:], tol=cgtol, max_iter=1000)[0] for i in range(Jac.shape[0])]).T
+    #Jacadj = Jac.T
+    #a = x.clone().detach() - m0 + Jacadj @ res
+    #M = Jac @ Jacadj * sigma**-2
+    #y = torch.linalg.solve(torch.eye(Jac.shape[0]) + M, Jac @ a)
+#      search_direction = - ( a - Jacadj @ y) 
+    #search_direction = - conjugate_gradient(lambda v : D(D(v)), Jac.T @ res - Jac.T @ y, tol=cgtol, max_iter=1000)[0] + m0 - x.clone().detach()
+    #kappa = torch.mean(D(D(torch.ones(Jac.shape[1]))))
+    #G = Jac @ Jac.T
+    #G2inv = torch.linalg.pinv(G @ G )
+    #def preconditioner(g):
+    #  return  Jac.T @ (G2inv @ (Jac @ g)) + kappa*-1 * g
+    search_direction, prev_solve_rnorm = conjugate_gradient(lambda v : Jac.T@(Jac@v) + D(D(v)), -grad - D(x.clone().detach() - m0), M=lambda m : prec**-1 * m, tol = cgtol, max_iter=10000)
 
     print(torch.dot(search_direction, grad))
 
     if torch.dot(search_direction, grad) > 0:
       print("bad direction")
-      search_direction = -preconditioner(grad.clone())
+      search_direction = -grad.clone()
 
     search_direction.requires_grad_(False)
 
@@ -323,14 +338,14 @@ def GN(
 
     print("Initiating Linesearch")
  
-    stepsize, loss, x = line_search(lambda x : .5 * torch.linalg.norm(residual(x))**2 + .5 * torch.linalg.norm(D(x.clone() - m0))**2, x, search_direction, loss.item(), maxstepi, max_evals=20, print_debug=print_debug)
+    stepsize, loss, x = line_search(lambda x : sum([f(x) + 5e-11 for f in fs]) + .5 * torch.linalg.norm(D(x.clone() - m0))**2, x, search_direction, loss.item(), maxstepi, max_evals=20, print_debug=print_debug)
 
-    Jac, res = jacobian_with_output(residual, x)
+    Jac, res = parallel_jacobian(fs, x)
 
     loss = loss.detach()
     grad = Jac.T @ res 
     
-    history.update(float(loss), float(torch.linalg.norm(grad)), parameters.targetDist(x), residual.forward_counter, residual.backward_counter)
+    history.update(float(loss), float(torch.linalg.norm(grad)), parameters.targetDist(x), fs[0].forward_counter, fs[0].backward_counter)
   return x, history 
 
 
@@ -343,8 +358,8 @@ def GNCG(
   h: torch.Tensor | None = None,
   m0: torch.Tensor | None = None,
   bfgsmemory: int | None = 20,
+  maxcgiter: int | None = 40,
   eta0: float = .1,
-  regJ: float =  1e-10,
   line_search: Callable[
     [Callable[[torch.Tensor], torch.Tensor], 
      torch.Tensor, torch.Tensor, 
@@ -359,10 +374,40 @@ def GNCG(
   if m0 is None:
     m0 = x0.clone().detach()
 
+  n = len(h)
+  
+  def A(x):
+      return D(D(x)) + h * x
+  
+  # Get eigenvalue bounds properly
+  def numpy_matvec(x_np):
+      return A(torch.tensor(x_np)).numpy()
+  
+  A_op = LinearOperator((n, n), matvec=numpy_matvec)
+  λ_min, λ_max = eigsh(A_op, k=2, which='BE', return_eigenvectors=False, tol=1e-3)
+  
+  # Ensure positive and properly scaled
+  if λ_min <= 0:
+      raise ValueError(f"Matrix not SPD: λ_min = {λ_min}")
+  
+  # Scale A so eigenvalues are in [-1, 1]
+  # A_scaled = (2A - (λ_max+λ_min)I)/(λ_max-λ_min)
+  omega = .9 * 2/λ_max
+  
+  def A(x):
+      return D(D(x)) + h * x
+  
+  # Choose omega conservatively to ensure convergence
+  # For SPD A, convergence if 0 < ω < 2/λ_max
+  
   def preconditioner(g):
-    with torch.no_grad():
-      out = -conjugate_gradient(lambda m : D(D(m)) + h * m, g.clone(), tol=.005, max_iter=10000)[0]
-    return out
+      u = torch.zeros_like(g)
+      for _ in range(250):
+          r = g - A(u)  # Residual
+          u = u + omega * r
+      return u
+
+  print(preconditioner(torch.randn(len(h))))
 
   history    = optHist()
   x          = x0.clone()
@@ -402,8 +447,8 @@ def GNCG(
       print(history.gradnorm[-1]*eta)
       print(torch.linalg.norm(grad)*eta)
 
-    search_direction, prev_solve_rnorm = conjugate_gradient(lambda v : gnHessProd(residual, x, v) + D(D(v)), -grad, M=lambda m, hist=copy.deepcopy(bfgsHist) : lbfgs_invhess(m, hist, init=preconditioner), print_debug=print_debug, tol = history.gradnorm[-1]*eta, memory = bfgsHist)
-    search_direction = search_direction
+    search_direction, prev_solve_rnorm = conjugate_gradient(lambda v : gnHessProd(residual, x, v) + D(D(v)), -grad, M=lambda m, hist=copy.deepcopy(bfgsHist) : lbfgs_invhess(m, hist, init=preconditioner), print_debug=print_debug, tol = history.gradnorm[-1]*eta, memory = bfgsHist, max_iter=maxcgiter)
+    #search_direction = Dinv(search_direction)
 
     print(torch.dot(search_direction, grad))
 
@@ -438,7 +483,7 @@ if __name__ == "__main__":
   f              = doubleRosenbrock.Sum()
   parameters     = optParams(maxiter = 1000, maxstep=4000, targetx = torch.ones(4), ltol = 1e-3)
   x0             = -torch.ones(4) 
-  xstar, history = CG(f, x0, parameters, D = lambda x : x*0)
+  xstar, history = CG(f, x0, parameters, D = lambda x : x, m0 = torch.ones(4))
   print(history.report)
   print(xstar)
 
@@ -446,15 +491,15 @@ if __name__ == "__main__":
   f              = doubleRosenbrock.Sum()
   parameters     = optParams(maxiter = 1000, maxstep=4000, targetx = torch.ones(4), ltol = 1e-3)
   x0             = -torch.ones(4) 
-  xstar, history, bfgshistory, _ = LBFGS(f, x0, parameters, D = lambda x : x*0, bfgsMemory = 5)
+  xstar, history, bfgshistory, _ = LBFGS(f, x0, parameters, D = lambda x : x, bfgsMemory = 5, m0 = torch.ones(4))
   print(history.report)
   print(xstar)
 
-  print("TESTING GN")
-  f              = doubleRosenbrock.Separate()
+  print("TESTING SFGN")
+  fs              = [doubleRosenbrock.SingleSep(i) for i in range(4)]
   parameters     = optParams(maxiter = 10, maxstep=10, targetx = torch.ones(4), ltol = 1e-3)
   x0             = -torch.ones(4) 
-  xstar, history = GN(f, x0, parameters, D = lambda x : x*0, line_search = line_search_backtrack)
+  xstar, history = SFGN(fs, x0, parameters, D = lambda x : x, line_search = line_search_backtrack, m0 = torch.ones(4))
   print(history.report)
   print(xstar)
 
@@ -462,7 +507,7 @@ if __name__ == "__main__":
   f              = doubleRosenbrock.Separate()
   parameters     = optParams(maxiter = 10, maxstep=10, targetx = torch.ones(4), ltol = 1e-3)
   x0             = -torch.ones(4) 
-  xstar, history = GNCG(f, x0, parameters, D = lambda x : x*0, line_search = line_search_backtrack)
+  xstar, history = GNCG(f, x0, parameters, eta0=.08, D = lambda x : x, line_search = line_search_backtrack, m0 = torch.ones(4))
   print(history.report)
   print(xstar)
 
