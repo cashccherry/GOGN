@@ -69,22 +69,6 @@ class SimulationPars():
     sos = butter(6, 1.5 * self.freq, fs=1/self.dt, output='sos')
     self.sos = [torch.tensor(sosi).to(torch.float64) for sosi in sos]
 
-#  def laplacian(self, u):
-#    u_grid = u.reshape(self.nx, self.nx)
-#    laplacian = torch.zeros_like(u_grid)
-#    
-#    # Interior points (standard 5-point stencil)
-#    laplacian[1:-1, 1:-1] = (
-#        u_grid[1:-1, 2:] + u_grid[1:-1, :-2] +  # x-direction neighbors
-#        u_grid[2:, 1:-1] + u_grid[:-2, 1:-1] -  # y-direction neighbors
-#        4 * u_grid[1:-1, 1:-1]                  # center point
-#    ) / self.dx**2
-#    
-#    # For homogeneous Dirichlet, boundary points remain 0
-#    # (u=0 on boundaries, so Laplacian at boundaries isn't typically used)
-#    
-#    return laplacian.flatten()
-
   def laplacian(self, u):
     u_grid = u.reshape(self.nx, self.nx)
     laplacian = torch.zeros_like(u_grid)
@@ -154,31 +138,6 @@ class SimulationPars():
     ) / self.dx**2
     
     return laplacian.flatten()
-
-#  def laplacian(self, u):
-#      u_grid = u.reshape(self.nx, self.nx)
-#      u_xx = torch.zeros_like(u_grid)
-#      u_yy = torch.zeros_like(u_grid)
-#      
-#      # Interior points for u_xx (standard central difference)
-#      u_xx[1:-1, :] = (u_grid[:-2, :] - 2*u_grid[1:-1, :] + u_grid[2:, :]) / self.dx**2
-#      
-#      # Neumann BCs for u_xx: ∂u/∂x = 0 at left and right boundaries
-#      # Using one-sided differences: u_x[0] = 0 → (u[1] - u[-1])/(2dx) = 0 → u[-1] = u[1]
-#      # So at left boundary: u_xx[0] = (u[-1] - 2u[0] + u[1])/dx² = (2u[1] - 2u[0])/dx²
-#      u_xx[0, :] = 2 * (u_grid[1, :] - u_grid[0, :]) / self.dx**2
-#      # At right boundary: u_x[-1] = 0 → (u[n] - u[n-2])/(2dx) = 0 → u[n] = u[n-2]
-#      # So u_xx[-1] = (u[-2] - 2u[-1] + u[n])/dx² = (2u[-2] - 2u[-1])/dx²
-#      u_xx[-1, :] = 2 * (u_grid[-2, :] - u_grid[-1, :]) / self.dx**2
-#      
-#      # Interior points for u_yy
-#      u_yy[:, 1:-1] = (u_grid[:, :-2] - 2*u_grid[:, 1:-1] + u_grid[:, 2:]) / self.dx**2
-#      
-#      # Neumann BCs for u_yy: ∂u/∂y = 0 at top and bottom boundaries
-#      u_yy[:, 0] = 2 * (u_grid[:, 1] - u_grid[:, 0]) / self.dx**2
-#      u_yy[:, -1] = 2 * (u_grid[:, -2] - u_grid[:, -1]) / self.dx**2
-#      
-#      return (u_xx + u_yy).flatten()
 
   def filt(self,x):
     return biquad(x, self.sos)
@@ -273,8 +232,8 @@ class SimulationPars():
       return im
 
   def plot_src_rec(self, ax: matplotlib.axes._axes.Axes):
-    ax.scatter(self.rec_loc[:,:,1].cpu()//1000, self.rec_loc[:,:,0].cpu()//1000, marker = 'v', color = 'y', linewidths=.25, edgecolors='k', s=8, label = 'Receivers')
-    ax.scatter(self.src_loc[:,0,1].cpu()//1000, self.src_loc[:,0,0].cpu()//1000, marker = '*', color = 'slategrey', linewidths=.5, edgecolors='k', s=60, label = 'Sources')
+    ax.scatter(self.rec_loc[:,:,0].cpu()//1000, self.rec_loc[:,:,1].cpu()//1000, marker = 'v', color = 'y', linewidths=.25, edgecolors='k', s=8, label = 'Receivers')
+    ax.scatter(self.src_loc[:,0,0].cpu()//1000, self.src_loc[:,0,1].cpu()//1000, marker = '*', color = 'slategrey', linewidths=.5, edgecolors='k', s=60, label = 'Sources')
    
 
 @dataclass

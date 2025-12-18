@@ -67,6 +67,7 @@ def line_search_backtrack(
     x:            torch.Tensor, 
     p:            torch.Tensor, 
     current_loss: float, 
+    phiprime: float | None = None,
     max_step:     float = 1.0, 
     max_evals:    int   = 10,
     print_debug:  bool  = True 
@@ -126,12 +127,86 @@ def line_search_backtrack(
   else:
     return step, loss_new, x_new
 
+def line_search_interpolate_grad(
+    f:            Callable[[torch.Tensor], torch.Tensor], 
+    x:            torch.Tensor, 
+    p:            torch.Tensor, 
+    current_loss: float, 
+    phiprime:     float | None = None,
+    max_step:     float = 1.0, 
+    max_evals:    int   = 10,
+    print_debug:  bool  = True 
+) -> Tuple[float, torch.Tensor, torch.Tensor]:
+  """
+  NEVER RECOMPUTES - stores the last successful computation.
+  """
+  steps = [0]
+  losses = [current_loss]
+  step = max_step
+  
+  # Store the last successful computation
+  last_successful_step = step
+  last_successful_x_new = None
+  last_successful_loss_new = None
+  
+  for i in range(max_evals):
+    # Compute once
+    x_new = x + step * p
+    x_new.requires_grad_(True)
+    loss_new = f(x_new)
+    
+    loss_val = loss_new.item()
+    steps.append(float(step))
+    losses.append(loss_val)
+    
+    # Store if successful
+    if loss_val < current_loss:
+      last_successful_step = step
+      last_successful_x_new = x_new
+      last_successful_loss_new = loss_new
+
+    # Check if we should return
+    if (loss_val < losses[0] or i == max_evals - 1) and len(steps) > 1:
+      if print_debug:
+        print("SUCCESSFUL LINESEARCH:")
+        print(f"step : {steps}")
+        print(f"loss : {losses}")
+      
+      # Return stored values - NO RECOMPUTATION
+      if last_successful_x_new is not None:
+          return last_successful_step, last_successful_loss_new, last_successful_x_new
+      else:
+          return step, loss_new, x_new
+    
+    # Update step size (same as before)
+    if (len(steps) >= 2 and len(steps) < 6):
+      phipp = 2 * (step**-2 * (losses[-1] - losses[0]) - step**-1 * phiprime)
+      step = - phiprime/phipp
+      step = min(max_step, max(step, 0))
+    else:
+      step = steps[-1] / 2
+    
+    if step == 0:
+      step = steps[-1] / 2
+  
+  if print_debug:
+    print("FAILED LINESEARCH")
+    print(f"step : {steps}")
+    print(f"phi   : {losses}")
+  
+  # Return stored values - NO RECOMPUTATION
+  if last_successful_x_new is not None:
+    return last_successful_step, last_successful_loss_new, last_successful_x_new
+  else:
+    return step, loss_new, x_new
+
 
 def line_search_interpolate(
     f:            Callable[[torch.Tensor], torch.Tensor], 
     x:            torch.Tensor, 
     p:            torch.Tensor, 
     current_loss: float, 
+    phiprime: float | None = None,
     max_step:     float = 1.0, 
     max_evals:    int   = 10,
     print_debug:  bool  = True 

@@ -26,7 +26,7 @@ def parallel_jacobian(misfit_modules: List[Callable[[torch.Tensor], torch.Tensor
        with torch.no_grad():
            m_local = input.detach().clone()
            m_local.requires_grad_()
-       res = (2 * misfit_modules[i](m_local) + 1e-10)**.5
+       res = (2 * (misfit_modules[i](m_local) + 1))**.5
        res.backward()
        return res, m_local.grad.clone()
    
