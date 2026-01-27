@@ -176,7 +176,7 @@ class SimulationPars():
     ### Get true data
     true_rec_amp = F(m_true)
 
-    d_obs = self.filt(true_rec_amp + sigma * torch.real(1*torch.fft.ifft(torch.abs(torch.fft.fft(true_rec_amp, dim=2))**.5 * torch.randn(true_rec_amp.shape))))
+    d_obs = self.filt(true_rec_amp + sigma * torch.real(1*torch.fft.ifft(torch.abs(torch.fft.fft(true_rec_amp, dim=2)) * torch.randn(true_rec_amp.shape))))
     d_obs.requires_grad_(False)
     return lambda x : self.filt(F(x)), d_obs, [lambda x, j=j : self.filt(Fs[j](x)) for j in range(self.n_events)]
   
@@ -234,6 +234,10 @@ class SimulationPars():
   def plot_src_rec(self, ax: matplotlib.axes._axes.Axes):
     ax.scatter(self.rec_loc[:,:,0].cpu()//1000, self.rec_loc[:,:,1].cpu()//1000, marker = 'v', color = 'y', linewidths=.25, edgecolors='k', s=8, label = 'Receivers')
     ax.scatter(self.src_loc[:,0,0].cpu()//1000, self.src_loc[:,0,1].cpu()//1000, marker = '*', color = 'slategrey', linewidths=.5, edgecolors='k', s=60, label = 'Sources')
+
+  def plot_ttpert(self, tau: torch.Tensor, ax: matplotlib.axes._axes.Axes):
+    ax.scatter(self.rec_loc[0,:,0].cpu()//1000, self.rec_loc[0,:,1].cpu()//1000, marker = '.', linewidths=.25, c=tau.flatten(), vmin = -torch.max(torch.abs(tau)), vmax = torch.max(torch.abs(tau)), cmap = 'seismic', s=30, label = 'Receivers')
+#    ax.scatter(self.src_loc[:,0,0].cpu()//1000, self.src_loc[:,0,1].cpu()//1000, marker = '*', color = 'slategrey', linewidths=.5, edgecolors='k', s=60, label = 'Sources')
    
 
 @dataclass

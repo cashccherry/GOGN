@@ -17,6 +17,21 @@ from sfgn.optimization.nonlinear import *
 coverage = sys.argv[1]
 sigma_noise = float(sys.argv[2])
 
+def alglabel(alg):
+  if alg == "CG":
+    return "NLCG"
+  if alg == "SFGN":
+    return "GOGN"
+  return alg
+
+def covglabel(covg):
+  if covg[:4] == "good":
+    return "Uniform"
+  if covg[:3] == "bad":
+    return "Realistic"
+  return covg 
+
+print(covglabel(coverage))
 
 src      = torch.tensor(np.load(os.path.join(CWD_file, f"FWI/{coverage}/srcs.npy")))
 rec      = torch.tensor(np.load(os.path.join(CWD_file, f"FWI/{coverage}/recs.npy")))
@@ -37,18 +52,18 @@ mGNCG = torch.load(os.path.join(os.getcwd(),'results', 'acoustic', f'{coverage}-
 fig, axes = plt.subplots(2, 2, figsize=(8, 8), constrained_layout=True)
 
 simPars.plot_model(mCG.detach(),   axes[0,0], fontsize = 16)
-axes[0,0].set_title("CG",    fontsize=24)
+axes[0,0].set_title("NLCG",    fontsize=24)
 simPars.plot_model(mLBFGS.detach(),   axes[0,1], fontsize = 16)
 axes[0,1].set_title("LBFGS", fontsize=24)
 simPars.plot_model(mSFGN.detach(),   axes[1,0], fontsize = 16)
-axes[1,0].set_title("SFGN",  fontsize=24)
+axes[1,0].set_title("GOGN",  fontsize=24)
 simPars.plot_model(mGNCG.detach(),   axes[1,1], fontsize = 16)
 axes[1,1].set_title("GN-CG", fontsize=24)
 
 for ax in axes.flatten():
   ax.set_aspect('equal')
 
-fig.suptitle(f"{coverage.capitalize()} Coverage, σ_noise = {sigma_noise}", fontsize=32)
+fig.suptitle(f"{covglabel(coverage)} Coverage, σ_noise = {sigma_noise}", fontsize=32)
 plt.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "reconstructions" + ".png"))
 
 import csv
@@ -65,6 +80,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
   objectives = []
   gradnorms = []
   model_errors = []
+  steplengths = []
   
   with open(os.path.join(os.getcwd(),'results', 'acoustic', f'{coverage}-{sigma_noise}-{alg}.csv'), 'r') as csvfile:
       reader = csv.DictReader(csvfile)
@@ -79,6 +95,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
               objectives.append(float(row['Objective']))
               gradnorms.append(float(row['Gradnorm']))
               model_errors.append(float(row['Model Error']))
+              steplengths.append(float(row['Steplength']))
           except (ValueError, KeyError) as e:
               print(f"Warning: Issue with row {row_num}: {e}")
               print(f"Row data: {row}")
@@ -93,6 +110,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
   results[f"objectives-{alg}"] = [o/objectives[0] for o in objectives]
   results[f"gradnorms-{alg}"] = [g/gradnorms[0] for g in gradnorms]
   results[f"model_errors-{alg}"] = [m/model_errors[0] for m in model_errors]
+  results[f"steplengths-{alg}"] = steplengths
 
 
 
@@ -106,7 +124,16 @@ std_constant = 3.0
 fig1 = plt.figure()
 ax = plt.axes()
 for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
-  ax.semilogy(results[f"iterations-{alg}"], results[f"objectives-{alg}"], linewidth=2, marker='o', markersize=8, label=alg);
+  ax.semilogy(results[f"iterations-{alg}"][:-1], results[f"steplengths-{alg}"][:-1], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
+plt.legend()
+plt.xlabel("Iterations", fontsize=labelsize)
+plt.ylabel("Steplength", fontsize=labelsize)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "iter-step" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+
+fig1 = plt.figure()
+ax = plt.axes()
+for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
+  ax.semilogy(results[f"iterations-{alg}"], results[f"objectives-{alg}"], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
 plt.legend()
 plt.xlabel("Iterations", fontsize=labelsize)
 plt.ylabel("Objective Function", fontsize=labelsize)
@@ -117,7 +144,7 @@ ax = plt.axes()
 xmax = []
 for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
   xmax.append(results[f"sims-{alg}"][-1])
-  ax.loglog(results[f"sims-{alg}"], results[f"objectives-{alg}"], linewidth=2, marker='o', markersize=8, label=alg);
+  ax.loglog(results[f"sims-{alg}"], results[f"objectives-{alg}"], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
 #plt.xlim(0, np.median(np.array(xmax)))
 plt.legend()
 plt.xlabel("PDE Solves", fontsize=labelsize)
@@ -129,7 +156,7 @@ ax = plt.axes()
 xmax = []
 for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
   xmax.append(results[f"times-{alg}"][-1])
-  ax.loglog(results[f"times-{alg}"], results[f"objectives-{alg}"], linewidth=2, marker='o', markersize=8, label=alg);
+  ax.loglog(results[f"times-{alg}"], results[f"objectives-{alg}"], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
 #plt.xlim(0, np.median(np.array(xmax)))
 plt.legend()
 plt.xlabel("Times", fontsize=labelsize)
@@ -139,7 +166,7 @@ fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.arg
 fig1 = plt.figure()
 ax = plt.axes()
 for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
-  ax.semilogy(results[f"iterations-{alg}"], results[f"model_errors-{alg}"], linewidth=2, marker='o', markersize=8, label=alg);
+  ax.semilogy(results[f"iterations-{alg}"], results[f"model_errors-{alg}"], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
 plt.legend()
 plt.xlabel("Iterations", fontsize=labelsize)
 plt.ylabel("Model Error", fontsize=labelsize)
@@ -150,7 +177,7 @@ ax = plt.axes()
 xmax = []
 for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
   xmax.append(results[f"sims-{alg}"][-1])
-  ax.loglog(results[f"sims-{alg}"], results[f"model_errors-{alg}"], linewidth=2, marker='o', markersize=8, label=alg);
+  ax.loglog(results[f"sims-{alg}"], results[f"model_errors-{alg}"], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
 #plt.xlim(0, np.median(np.array(xmax)))
 plt.legend()
 plt.xlabel("PDE Solves", fontsize=labelsize)
@@ -162,7 +189,7 @@ ax = plt.axes()
 xmax = []
 for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
   xmax.append(results[f"times-{alg}"][-1])
-  ax.loglog(results[f"times-{alg}"], results[f"model_errors-{alg}"], linewidth=2, marker='o', markersize=8, label=alg);
+  ax.loglog(results[f"times-{alg}"], results[f"model_errors-{alg}"], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
 #plt.xlim(0, np.median(np.array(xmax)))
 plt.legend()
 plt.xlabel("Times", fontsize=labelsize)
@@ -172,7 +199,7 @@ fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.arg
 fig1 = plt.figure()
 ax = plt.axes()
 for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
-  ax.semilogy(results[f"iterations-{alg}"], results[f"gradnorms-{alg}"], linewidth=2, marker='o', markersize=8, label=alg);
+  ax.semilogy(results[f"iterations-{alg}"], results[f"gradnorms-{alg}"], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
 plt.legend()
 plt.xlabel("Iterations", fontsize=labelsize)
 plt.ylabel("Gradient Norm", fontsize=labelsize)
@@ -183,7 +210,7 @@ ax = plt.axes()
 xmax = []
 for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
   xmax.append(results[f"sims-{alg}"][-1])
-  ax.loglog(results[f"sims-{alg}"], results[f"gradnorms-{alg}"], linewidth=2, marker='o', markersize=8, label=alg);
+  ax.loglog(results[f"sims-{alg}"], results[f"gradnorms-{alg}"], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
 #plt.xlim(0, np.median(np.array(xmax)))
 plt.legend()
 plt.xlabel("PDE Solves", fontsize=labelsize)
@@ -195,7 +222,7 @@ ax = plt.axes()
 xmax = []
 for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
   xmax.append(results[f"times-{alg}"][-1])
-  ax.loglog(results[f"times-{alg}"], results[f"gradnorms-{alg}"], linewidth=2, marker='o', markersize=8, label=alg);
+  ax.loglog(results[f"times-{alg}"], results[f"gradnorms-{alg}"], linewidth=2, marker='o', markersize=8, label=alglabel(alg));
 #plt.xlim(0, np.median(np.array(xmax)))
 plt.legend()
 plt.xlabel("Times", fontsize=labelsize)

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from scipy.sparse.linalg import LinearOperator, eigsh
 
 from sfgn.objectives       import doubleRosenbrock
-from sfgn.objectives.utils import jacobian_with_output, parallel_jacobian, gnHessProd
+from sfgn.objectives.utils import jacobian_with_output, parallel_jacobian, parallel_forward, parallel_backward, gnHessProd
 
 import psutil
 import os
@@ -50,7 +50,8 @@ class optHist:
   times: List[float]      = field(default_factory=list)
   forwards: List[float]   = field(default_factory=list)
   backwards: List[float]  = field(default_factory=list)
-
+  steplengths: List[float]  = field(default_factory=list)
+ 
   _start_time: float = 0
 
   def __post_init__(self):
@@ -65,6 +66,9 @@ class optHist:
     self.forwards.append(forwards)
     self.backwards.append(backwards)
 
+  def updateStepLength(self, alpha: float):
+    self.steplengths.append(alpha)
+
   def checkConverged(self, parameters: optParams) -> bool:
     if self.iteration > 2:
       if (abs(self.loss[-1] - self.loss[-2])/self.loss[0] <= 1e-10):
@@ -74,9 +78,11 @@ class optHist:
   def writeCSV(self, path: str):
    with open(path, 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
-    writer.writerow(["Iteration", "Time", "Forwards", "Backwards", "Objective", "Gradnorm", "Model Error"])
-    for i in range(self.iteration):
-      writer.writerow([i,self.times[i],self.forwards[i],self.backwards[i],self.loss[i],self.gradnorm[i],self.targetdist[i]])
+    writer.writerow(["Iteration", "Time", "Forwards", "Backwards", "Objective", "Gradnorm", "Model Error", "Steplength"])
+    for i in range(self.iteration - 1):
+      writer.writerow([i,self.times[i],self.forwards[i],self.backwards[i],self.loss[i],self.gradnorm[i],self.targetdist[i],self.steplengths[i]])
+    i = self.iteration - 1
+    writer.writerow([i,self.times[i],self.forwards[i],self.backwards[i],self.loss[i],self.gradnorm[i],self.targetdist[i],0])
 
   @property
   def report(self) -> str:
@@ -175,8 +181,10 @@ def CG(
     grad_old = grad
 
     maxstepi = history.gradnorm[-1] * history.gradnorm[0]**-1 * parameters.maxstep * torch.max(torch.abs(search_direction))**-1
+#    maxstepi = 1
 
     stepsize, loss, x = line_search(lambda x : f(x) + .5 * torch.linalg.norm(D(x - m0))**2, x, search_direction, loss.item(), phiprime, maxstepi, max_evals=20, print_debug=print_debug)
+    history.updateStepLength(float(stepsize))
     grad = torch.autograd.grad(loss,x)[0]
 
     loss = loss.detach()
@@ -234,7 +242,11 @@ def LBFGS(
       print(history.report)  
       print(f"Current RAM usage: {get_memory_usage():.2f} MB")
     with torch.no_grad():
-      search_direction = -conjugate_gradient(lambda m : D(D(m)) + h * m, lbfgs_invhess(grad, bfgsHist), tol=.005, max_iter=10000)[0]
+#      search_direction = -conjugate_gradient(lambda m : D(D(m)) + h * m, lbfgs_invhess(grad, bfgsHist), tol=.005, max_iter=10000)[0]
+#      search_direction = -lbfgs_invhess(grad, bfgsHist, init= lambda g : conjugate_gradient(lambda m : D(D(m)) + h * m, g, tol=.005, max_iter=1000)[0])
+#      search_direction = -conjugate_gradient(lambda m : D(D(m)), lbfgs_invhess(grad, bfgsHist, init=lambda m : m/h), tol=.005, max_iter=10000)[0]
+      search_direction = -conjugate_gradient(lambda m : D(D(m)), lbfgs_invhess(grad, bfgsHist, init= lambda g : conjugate_gradient(lambda m : D(D(m)) + h * m, g, tol=.005, max_iter=1000)[0]), tol=.005, max_iter=10000)[0]
+
     phiprime = torch.dot(search_direction, grad)
 
     if phiprime > 0:
@@ -250,7 +262,7 @@ def LBFGS(
 
     maxstepi = parameters.maxstep * torch.max(torch.abs(search_direction))**-1
     if torch.isinf(maxstepi):
-      print("Problem with BFGS update, resetting history")
+      #print("Problem with BFGS update, resetting history")
       print(torch.max(torch.abs(grad)))
       print(torch.max(torch.abs(search_direction)))
 
@@ -259,8 +271,8 @@ def LBFGS(
         search_direction = -conjugate_gradient(lambda m : D(D(m)) + h * m, grad.clone(), tol=.005, max_iter=10000)[0]
       maxstepi = parameters.maxstep * torch.max(torch.abs(search_direction))**-1
       phiprime = torch.dot(search_direction, grad)
-
     stepsize, loss, x = line_search(lambda x : f(x) + .5 * torch.linalg.norm(D(x - m0))**2, x, search_direction, loss.item(), phiprime, maxstepi, max_evals=20, print_debug=print_debug)
+    history.updateStepLength(float(stepsize))
     grad = torch.autograd.grad(loss,x)[0]
 
     loss = loss.detach()
@@ -381,10 +393,24 @@ def SFGN(
     maxstepi = parameters.maxstep * torch.max(torch.abs(search_direction))**-1
 
     print("Initiating Linesearch")
- 
-    stepsize, loss, x = line_search(lambda x : sum([f(x) + 1 for f in fs]) + .5 * torch.linalg.norm(D(x.clone() - m0))**2, x, search_direction, loss.item(), phiprime, maxstepi, max_evals=20, print_debug=print_debug)
 
-    Jac, res = parallel_jacobian(fs, x)
+    residuals, graph = [], [] 
+
+    def calculate_loss(x):
+      nonlocal residuals
+      nonlocal graph
+      residuals, graph = parallel_forward(fs, x) 
+      return sum([.5 * r**2 for r in residuals]) + .5 * torch.linalg.norm(D(x.clone() - m0))**2
+
+    stepsize, loss, x = line_search(calculate_loss, x, search_direction, loss.item(), phiprime, maxstepi, max_evals=20, print_debug=print_debug)
+    history.updateStepLength(float(stepsize))
+
+    Jac = torch.stack(parallel_backward(residuals, graph)) 
+    res = torch.tensor(residuals)
+
+    #stepsize, loss, x = line_search(lambda x : sum([f(x) + 1 for f in fs]) + .5 * torch.linalg.norm(D(x.clone() - m0))**2, x, search_direction, loss.item(), phiprime, maxstepi, max_evals=20, print_debug=print_debug)
+
+    #Jac, res = parallel_jacobian(fs, x)
 
     loss = loss.detach()
     grad = Jac.T @ res 
@@ -399,6 +425,7 @@ def GNCG(
   x0: torch.Tensor,
   parameters: optParams, 
   D: Callable[[torch.Tensor], torch.Tensor] = lambda x : x,
+  D2diag: torch.Tensor | None = None,
   h: torch.Tensor | None = None,
   m0: torch.Tensor | None = None,
   bfgsmemory: int | None = 20,
@@ -414,6 +441,9 @@ def GNCG(
   """GN-CG Implementation"""
   if h is None:
     h = torch.ones_like(x0) 
+
+  if D2diag is None:
+    D2diag = torch.ones(len(h)) 
 
   if m0 is None:
     m0 = x0.clone().detach()
@@ -438,9 +468,6 @@ def GNCG(
   # A_scaled = (2A - (λ_max+λ_min)I)/(λ_max-λ_min)
   omega = .9 * 2/λ_max
   
-  def A(x):
-      return D(D(x)) + h * x
-  
   # Choose omega conservatively to ensure convergence
   # For SPD A, convergence if 0 < ω < 2/λ_max
   
@@ -450,6 +477,18 @@ def GNCG(
           r = g - A(u)  # Residual
           u = u + omega * r
       return u
+ 
+  #diaginv = (D2diag + h)**-1
+  #
+  #def preconditioner(g):
+  #  u = torch.zeros_like(g)
+  #  with torch.no_grad():
+  #    for _ in range(100):
+  #      u = u + diaginv * (g - A(u))
+  #  return u
+
+
+
 
   print(preconditioner(torch.randn(len(h))))
 
@@ -512,6 +551,8 @@ def GNCG(
     print("Initiating Linesearch")
  
     stepsize, loss, x = line_search(lambda x : .5 * torch.linalg.norm(residual(x))**2 + .5 * torch.linalg.norm(D(x.clone() - m0))**2, x, search_direction, loss.item(), phiprime, maxstepi, max_evals=20, print_debug=print_debug)
+    history.updateStepLength(float(stepsize))
+
     grad = torch.autograd.grad(loss,x)[0]
 
     loss = loss.detach()

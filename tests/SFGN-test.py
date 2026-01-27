@@ -13,6 +13,8 @@ def percent_formatter(x, pos):
 from sfgn.objectives.FWI import *
 from sfgn.optimization.utils import line_search_interpolate_grad, line_search_interpolate, line_search_backtrack
 from sfgn.optimization.nonlinear import *
+from sfgn.optimization.utils import conjugate_gradient 
+
 
 coverage = sys.argv[1]
 sigma_noise = float(sys.argv[2])
@@ -64,7 +66,43 @@ parameters     = optParams(maxiter = 500, maxsim = 100, maxstep=.05, targetx = m
 
 D = lambda m : sigma**-1 * (- simPars.laplacian(m) + nu *  m) * simPars.dx
 
-#D = lambda m : sigma**-1 * (- simPars.laplacian(m) + nu * prec * m) * simPars.dx
+# # #D = lambda m : sigma**-1 * (- simPars.laplacian(m) + nu * prec * m) * simPars.dx
+# # 
+# # fig, axes = plt.subplots(1,3,figsize=(5.25, 4), constrained_layout = True)
+# # im = simPars.plot_std(prec.detach(), axes[0])
+# # simPars.plot_src_rec(axes[0])
+# # cbar = plt.colorbar(im)
+# # cbar.set_label("% Speed Perturbation", fontsize=16)
+# # cbar.formatter = FuncFormatter(percent_formatter)
+# # cbar.update_ticks()
+# # axes[0].legend()
+# # axes[0].set_aspect('equal')
+# # axes[0].set_title('Preconditioner')
+# # 
+# # #n = torch.randn_like(prec)
+# # #n = torch.outer(*2*[2.0*((torch.arange(simPars.nx) // 5) % 2) - 1]).flatten()
+# # n = grad.detach()
+# # 
+# # im = simPars.plot_grad(n.detach(), axes[1])
+# # axes[1].set_aspect('equal')
+# # axes[1].set_title('Gradient')
+# # cbar = plt.colorbar(im)
+# # cbar.formatter = FuncFormatter(percent_formatter)
+# # cbar.update_ticks()
+# # 
+# # im = simPars.plot_grad(conjugate_gradient(lambda m : D(D(m)) + prec * m, n, tol=.005, max_iter=10000)[0].detach(), axes[2])
+# # axes[2].set_aspect('equal')
+# # axes[2].set_title('Preconditioned Gradient')
+# # cbar = plt.colorbar(im)
+# # cbar.formatter = FuncFormatter(percent_formatter)
+# # cbar.update_ticks()
+# # 
+# # fig.suptitle(f"Effect of Preconditioning", fontsize=18)
+# # plt.show()
+# # 
+# # #plt.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', f"{coverage}-true" + ".png"))
+# # #torch.save(m_true, os.path.join(os.getcwd(),'results', 'acoustic', f'{coverage}-true.pt'))
+
 
 
 if os.path.isfile("D2lo.pt"):
@@ -115,7 +153,7 @@ D2diag = sigma**-2 * torch.flatten(alpha * simPars.dx**-2 + beta * nu + nu**2 * 
 
 print("Running CG")
 f       = waveformMisfit(F, d_obs, weights)
-mCG, historyCG, = CG(f, m0, parameters, D=D, h = prec, print_debug=True, line_search=line_search_interpolate_grad)
+mCG, historyCG, = CG(f, m0, parameters, D=D, h = prec, print_debug=True, line_search = line_search_interpolate_grad)
 
 print(historyCG.report)
 
@@ -135,7 +173,7 @@ torch.save(mCG, os.path.join(os.getcwd(),'results', 'acoustic', f'{coverage}-{si
  
 print("Running LBFGS")
 f       = waveformMisfit(F, d_obs, weights)
-mLBFGS, historyLBFGS, bfgsHist, _ = LBFGS(f, m0, parameters, D=D, h = prec, bfgsMemory=10, print_debug=True, line_search=line_search_interpolate_grad)
+mLBFGS, historyLBFGS, bfgsHist, _ = LBFGS(f, m0, parameters, D=D, h = prec, bfgsMemory=10, print_debug=True, line_search = line_search_interpolate_grad)
 
 print(historyLBFGS.report)
 
@@ -176,7 +214,7 @@ torch.save(mSFGN, os.path.join(os.getcwd(),'results', 'acoustic', f'{coverage}-{
 
 print("Running GNCG")
 residual = fullResidual(F, d_obs, weights)
-mGNCG, historyGNCG = GNCG(residual, m0, parameters, eta0=.8, D=D, h=prec, print_debug=True, maxcgiter=20, line_search=line_search_interpolate_grad)
+mGNCG, historyGNCG = GNCG(residual, m0, parameters, eta0=.8, D=D, D2diag=D2diag, h=prec, print_debug=True, maxcgiter=20, line_search=line_search_interpolate_grad)
 
 print(historyGNCG.report)
 
