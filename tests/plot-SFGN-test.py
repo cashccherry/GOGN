@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
 def percent_formatter(x, pos):
-    return f"{x*100:+.0f}%"
+  return f"{x*100:+.0f}%"
 
 from sfgn.objectives.FWI import *
 from sfgn.optimization.utils import line_search_interpolate_grad, line_search_interpolate, line_search_backtrack
@@ -48,6 +48,19 @@ mSFGN = torch.load(os.path.join(os.getcwd(),'results', 'acoustic', f'{coverage}-
 
 mGNCG = torch.load(os.path.join(os.getcwd(),'results', 'acoustic', f'{coverage}-{sigma_noise}-GNCG.pt'))
 
+fig = plt.figure(figsize=(5.25, 4), constrained_layout = True)
+im = simPars.plot_model(m_true.detach(), plt.gca(), fontsize = 16)
+simPars.plot_src_rec(plt.gca())
+cbar = plt.colorbar(im)
+cbar.set_label("% Speed Perturbation", fontsize=18)
+cbar.formatter = FuncFormatter(percent_formatter)
+cbar.update_ticks()
+plt.legend()
+plt.gca().set_aspect('equal')
+fig.suptitle(f"{covglabel(coverage)} Coverage", fontsize=24)
+plt.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', f"{coverage}-true" + ".png"), dpi=800)
+
+plt.close('all')
 
 fig, axes = plt.subplots(2, 2, figsize=(8, 8), constrained_layout=True)
 
@@ -64,7 +77,7 @@ for ax in axes.flatten():
   ax.set_aspect('equal')
 
 fig.suptitle(f"{covglabel(coverage)} Coverage, σ_noise = {sigma_noise}", fontsize=32)
-plt.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "reconstructions" + ".png"))
+plt.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "reconstructions" + ".png"), dpi = 800)
 
 import csv
 
@@ -128,7 +141,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("Iterations", fontsize=labelsize)
 plt.ylabel("Steplength", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "iter-step" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "iter-step" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 fig1 = plt.figure()
 ax = plt.axes()
@@ -137,7 +150,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("Iterations", fontsize=labelsize)
 plt.ylabel("Objective Function", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "iter-obj" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "iter-obj" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 fig1 = plt.figure()
 ax = plt.axes()
@@ -149,7 +162,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("PDE Solves", fontsize=labelsize)
 plt.ylabel("Objective Function", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "work-obj" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "work-obj" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 fig1 = plt.figure()
 ax = plt.axes()
@@ -161,7 +174,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("Times", fontsize=labelsize)
 plt.ylabel("Objective Function", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "time-obj" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "time-obj" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 fig1 = plt.figure()
 ax = plt.axes()
@@ -170,7 +183,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("Iterations", fontsize=labelsize)
 plt.ylabel("Model Error", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "iter-err" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "iter-err" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 fig1 = plt.figure()
 ax = plt.axes()
@@ -182,7 +195,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("PDE Solves", fontsize=labelsize)
 plt.ylabel("Model Error", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "work-err" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "work-err" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 fig1 = plt.figure()
 ax = plt.axes()
@@ -194,7 +207,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("Times", fontsize=labelsize)
 plt.ylabel("Model Error", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "time-err" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "time-err" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 fig1 = plt.figure()
 ax = plt.axes()
@@ -203,7 +216,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("Iterations", fontsize=labelsize)
 plt.ylabel("Gradient Norm", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "iter-grad" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "iter-grad" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 fig1 = plt.figure()
 ax = plt.axes()
@@ -215,7 +228,7 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("PDE Solves", fontsize=labelsize)
 plt.ylabel("Gradient Norm", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "work-grad" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "work-grad" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 fig1 = plt.figure()
 ax = plt.axes()
@@ -227,6 +240,6 @@ for alg in ["CG", "LBFGS", "SFGN", "GNCG"]:
 plt.legend()
 plt.xlabel("Times", fontsize=labelsize)
 plt.ylabel("Gradient Norm", fontsize=labelsize)
-fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "time-grad" + ".png"), dpi=300 , bbox_inches="tight", pad_inches=0.0)
+fig1.savefig(os.path.join(os.getcwd(), 'figures',  'acoustic', coverage, sys.argv[2], "time-grad" + ".png"), dpi=800 , bbox_inches="tight", pad_inches=0.0)
 
 
