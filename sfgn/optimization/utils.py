@@ -12,8 +12,8 @@ class bfgsHistory:
   
   def update(self, s: torch.Tensor, y: torch.Tensor):
     """Update history"""
-    self.S.append(s)
-    self.Y.append(y)
+    self.S.append(s.detach().clone())
+    self.Y.append(y.detach().clone())
 
     assert len(self.Y) == len(self.S) #make sure no funny business
     
@@ -326,8 +326,8 @@ def conjugate_gradient(
 
     Ap = A(p)
 
-    if torch.dot(Ap, p) < 0:
-      print("Negative Curvature Detected in Conjugate Gradient")
+    if torch.dot(Ap, p) < -1e-7 * torch.dot(p, p):
+      print(f"Negative Curvature Detected in Conjugate Gradient :  {torch.dot(Ap, p) / torch.dot(p,p)}")
       break
 
     if memory is not None:
@@ -359,6 +359,137 @@ def conjugate_gradient(
     p = -z + beta * p 
   print("CG DONE") 
   return x, rnorm
+
+
+import torch
+
+class LimitedMemoryStructuredSecantTorch:
+    """
+    Limited-memory implementation of the Dennis-Gay-Welsch structured secant update
+    (eq. 10.43) using PyTorch tensors. Suitable for large-scale nonlinear least squares
+    on CPU or GPU.
+
+    - Approximates the second-order term S ≈ sum r_j ∇² r_j implicitly.
+    - Supports fast matrix-vector products: S @ v in O(m n) time.
+    - Enforces the secant condition exactly: S_new @ s ≈ y_hash (up to numerical precision).
+    - Initial approximation: S_0 = gamma * I.
+    """
+    def __init__(
+        self,
+        n: int,
+        m: int = 10,
+        gamma: float = 1.0,
+        update_gamma: bool = True,
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        dtype: torch.dtype = torch.float64,  # or torch.float32 for faster but less precise
+    ):
+        """
+        Args:
+            n: Dimension of the variables (length of x, s, y, etc.).
+            m: Maximum number of stored updates (memory parameter, typically 5–20).
+            gamma: Initial scaling for S_0 = gamma * I.
+            update_gamma: If True, set gamma ← (y^T s) / ||y||² at each step.
+            device: 'cuda' or 'cpu'.
+            dtype: torch.float64 (recommended for quasi-Newton stability) or torch.float32.
+        """
+        self.n = n
+        self.m_max = m
+        self.gamma = gamma
+        self.update_gamma = update_gamma
+        self.device = torch.device(device)
+        self.dtype = dtype
+
+        # History lists: oldest first
+        self.ys = []       # y vectors
+        self.zs = []       # z = y_hash - S_prev @ s
+        self.denoms = []   # y^T s
+        self.sigmas = []   # z^T s
+
+    def _matvec(self, v: torch.Tensor) -> torch.Tensor:
+        """Compute current S @ v using the stored updates."""
+        v = v.to(dtype=self.dtype)
+
+        q = self.gamma * v.clone()
+        for y, z, denom, sigma in zip(self.ys, self.zs, self.denoms, self.sigmas):
+            if torch.abs(denom) < 1e-14:
+                continue  # skip numerically unstable update
+
+            yTq = torch.dot(y, q)
+            zTq = torch.dot(z, q)
+
+            term1 = (zTq / denom) * y
+            term2 = (yTq / denom) * z
+            term3 = (sigma * yTq / (denom ** 2)) * y
+
+            q = q + term1 + term2 - term3
+
+        return q
+
+    def matvec(self, v: torch.Tensor) -> torch.Tensor:
+        """Public method: compute S @ v."""
+        v = v.to(dtype=self.dtype)
+
+        if v.device != self.device:
+            v = v.to(self.device, dtype=self.dtype)
+        return self._matvec(v)
+
+    def update(
+        self,
+        s: torch.Tensor,
+        y: torch.Tensor,
+        y_hash: torch.Tensor,
+    ):
+        """
+        Perform one update using formula (10.43).
+
+        Args:
+            s: step = x_{k+1} - x_k          (shape (n,))
+            y: J_{k+1}^T r_{k+1} - J_k^T r_k (shape (n,))
+            y_hash: J_{k+1}^T r_{k+1} - J_k^T r_{k+1} (shape (n,))
+        """
+        # Move to correct device/dtype if needed
+        s = s.to(self.device, dtype=self.dtype)
+        y = y.to(self.device, dtype=self.dtype)
+        y_hash = y_hash.to(self.device, dtype=self.dtype)
+
+        # Compute z = y_hash - S_k @ s
+        S_s = self._matvec(s)
+        z = y_hash - S_s
+
+        denom = torch.dot(y, s)
+        if torch.abs(denom) < 1e-14:
+            print("Warning: y^T s too small; update skipped.")
+            return
+
+        sigma = torch.dot(z, s)
+
+        # Optional: update scaling (common quasi-Newton heuristic)
+        if self.update_gamma:
+            y_norm_sq = torch.dot(y, y)
+            if y_norm_sq > 1e-14:
+                self.gamma = denom / y_norm_sq  # or denom / y_norm_sq (BFGS-like scaling)
+
+        # Store the new update
+        self.ys.append(y.clone())
+        self.zs.append(z.clone())
+        self.denoms.append(denom)
+        self.sigmas.append(sigma)
+
+        # Enforce limited memory
+        if len(self.ys) > self.m_max:
+            self.ys.pop(0)
+            self.zs.pop(0)
+            self.denoms.pop(0)
+            self.sigmas.pop(0)
+
+    def reset(self):
+        """Clear history and reset to initial approximation."""
+        self.ys.clear()
+        self.zs.clear()
+        self.denoms.clear()
+        self.sigmas.clear()
+        # gamma can be kept or reset to initial value if desired
+
 
 
 if __name__ == "__main__":

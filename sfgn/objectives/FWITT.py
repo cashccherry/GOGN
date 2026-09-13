@@ -237,8 +237,9 @@ class SimulationPars():
     ### Get true data
     true_rec_amp = self.filt(F(m_true))
      
-    return lambda x : deltat_vectorized(true_rec_amp, self.filt(F(x))), [lambda x, j=j : deltat_vectorized(true_rec_amp[[i]], self.filt(Fs[j](x))) for j in range(self.n_events)]
-  
+    return lambda x : deltat_vectorized(true_rec_amp, self.filt(F(x))), [lambda x, j=j : deltat_vectorized(true_rec_amp[[j]], self.filt(Fs[j](x))) for j in range(self.n_events)]
+ 
+ 
   def get_geom_weights(self, d_obs: torch.Tensor, kernel: Callable[[torch.Tensor], torch.Tensor] ) -> torch.Tensor:
     # Geometric Weighting for Observations
     def recdensity(xx, yy):
@@ -248,10 +249,11 @@ class SimulationPars():
       return recdens
  
  
-    weights  = d_obs**-1
-    #rdens    = recdensity(self.rec_loc[...,0], self.rec_loc[...,1]).unsqueeze(-1)**-.5
-    #weights *= rdens/torch.linalg.norm(rdens.flatten(), np.inf)
-    #weights /= torch.max(weights)
+    weights  = d_obs*0 + 1.
+    rdens    = recdensity(self.rec_loc[...,0], self.rec_loc[...,1]).unsqueeze(-1)**-.5
+
+    weights *= rdens.reshape(weights.shape)/torch.linalg.norm(rdens.flatten(), np.inf)
+    weights /= torch.max(weights)
     weights.requires_grad_(False)
     
     return weights
@@ -340,19 +342,20 @@ def percent_formatter(x, pos):
 
 class fullResidual(nn.Module):
   """This gives a residual F(m) - d"""
-  def __init__(self, F: Callable[[torch.Tensor], torch.Tensor], d_obs: torch.Tensor, rootprec: Callable[[torch.Tensor], torch.Tensor]):
+  def __init__(self, F: Callable[[torch.Tensor], torch.Tensor], d_obs: torch.Tensor, rootprec: Callable[[torch.Tensor], torch.Tensor], p: float = 2.0):
     super().__init__()
     self.forward_counter  = 0
     self.backward_counter = 0
     self.F                = F
     self.data             = d_obs
     self.rootprec         = rootprec 
-
+    self.p                = p
+ 
   def forward(self, x):
     self.forward_counter += 1
 
     unweighted_res = self.F(x) - self.data
-    output = self.rootprec(unweighted_res)
+    output = (2.0/self.p)**.5 * torch.abs(self.rootprec(unweighted_res))**(self.p/2.0)
  
     if x.requires_grad:
       output.register_hook(self._backward_hook)
@@ -364,9 +367,9 @@ class fullResidual(nn.Module):
 
 class waveformMisfit(nn.Module):
   """This gives the full waveform misfit chi(m) = .5 \|F(m) - d\|^2"""
-  def __init__(self, F: Callable[[torch.Tensor], torch.Tensor], d_obs: torch.Tensor, rootprec: Callable[[torch.Tensor], torch.Tensor]):
+  def __init__(self, F: Callable[[torch.Tensor], torch.Tensor], d_obs: torch.Tensor, rootprec: Callable[[torch.Tensor], torch.Tensor], p: float = 2.0):
     super().__init__()
-    self.residual = fullResidual(F, d_obs, rootprec)
+    self.residual = fullResidual(F, d_obs, rootprec, p)
 
   def forward(self, x):
     outputs = self.residual(x)
@@ -382,19 +385,20 @@ class waveformMisfit(nn.Module):
 
 class sourceMisfits(nn.Module):
   """This gives the GN-S source misfits chi_i(m) = .5 \|F_i(m) - d_i\|^2"""
-  def __init__(self, F: Callable[[torch.Tensor], torch.Tensor], d_obs: torch.Tensor, rootprec: Callable[[torch.Tensor], torch.Tensor]):
+  def __init__(self, F: Callable[[torch.Tensor], torch.Tensor], d_obs: torch.Tensor, rootprec: Callable[[torch.Tensor], torch.Tensor], p: float = 2.0):
     super().__init__()
     self.forward_counter  = 0
     self.backward_counter = 0
     self.F                = F
     self.data             = d_obs
     self.rootprec         = rootprec 
+    self.p                = p
 
   def forward(self, x):
     self.forward_counter += 1
     d_pred = self.F(x).contiguous()
     weighted_res = self.rootprec(d_pred - self.data)
-    res_squared = torch.sum(weighted_res**2, dim=[1]) / 2
+    res_squared = torch.sum(torch.abs(weighted_res)**self.p, dim=[1]) / self.p
     return res_squared
     
   def _backward_hook(self, grad):
@@ -419,9 +423,9 @@ if __name__ == "__main__":
   print(torch.linalg.norm(F(m_init)[[0]] - Fs[0](m_init)))
 
 
-  fr  = fullResidual(F, torch.zeros_like(F(m_true)), lambda x:x)
-  chi = waveformMisfit(F, torch.zeros_like(F(m_true)), lambda x:x)
-  ss  = sourceMisfits(F, torch.zeros_like(F(m_true)), lambda x:x)
+  fr  = fullResidual(F, torch.zeros_like(F(m_true)), lambda x:x, p = 3)
+  chi = waveformMisfit(F, torch.zeros_like(F(m_true)), lambda x:x, p = 3)
+  ss  = sourceMisfits(F, torch.zeros_like(F(m_true)), lambda x:x, p = 3)
 
   chis = [waveformMisfit(Fs[i], torch.zeros_like(F(m_true)), lambda x:x) for i in range(len(Fs))]
 
