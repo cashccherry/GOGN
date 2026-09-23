@@ -1,5 +1,8 @@
 import os
 import sys
+from pathlib import Path
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 import torch
 import numpy as np
@@ -10,9 +13,9 @@ from matplotlib.ticker import FuncFormatter
 def percent_formatter(x, pos):
     return f"{x*100:+.0f}%"
 
-from sfgn.objectives.FWI import *
-from sfgn.optimization.utils import line_search_interpolate_grad, line_search_interpolate, line_search_backtrack
-from sfgn.optimization.nonlinear import *
+from gogn.objectives.FWI import *
+from gogn.optimization.utils import line_search_interpolate_grad, line_search_interpolate, line_search_backtrack
+from gogn.optimization.nonlinear import *
 
 
 coverages    = ['good', 'bad', 'good25', 'bad25']
@@ -40,7 +43,7 @@ for coverage in coverages:
       model_errors = []
       steplengths = []
       
-      with open(os.path.join(os.getcwd(),'results', 'acoustic', f'{coverage}-{sigma_noise}-{alg}.csv'), 'r') as csvfile:
+      with open(os.path.join(Path(os.environ.get("GOGN_OUTPUT_DIR", REPO_ROOT)).expanduser().resolve(),'results', 'acoustic', f'{coverage}-{sigma_noise}-{alg}.csv'), 'r') as csvfile:
           reader = csv.DictReader(csvfile)
           
           for row_num, row in enumerate(reader, start=2):  # start=2 because header is row 1
@@ -123,23 +126,23 @@ for coverage in cov25s:
 
 import csv
 
-with open(os.path.join(os.getcwd(),'results', 'acoustic', f'final_objective.csv'), 'w') as csvfile:
+with open(os.path.join(Path(os.environ.get("GOGN_OUTPUT_DIR", REPO_ROOT)).expanduser().resolve(),'results', 'acoustic', f'final_objective.csv'), 'w') as csvfile:
   writer = csv.writer(csvfile)
   for row in final_objective:
     writer.writerow(row)
 
-with open(os.path.join(os.getcwd(),'results', 'acoustic', f'best_error.csv'), 'w') as csvfile:
+with open(os.path.join(Path(os.environ.get("GOGN_OUTPUT_DIR", REPO_ROOT)).expanduser().resolve(),'results', 'acoustic', f'best_error.csv'), 'w') as csvfile:
   writer = csv.writer(csvfile)
   for row in best_error:
     writer.writerow(row)
 
 
-with open(os.path.join(os.getcwd(),'results', 'acoustic', f'final_objective25.csv'), 'w') as csvfile:
+with open(os.path.join(Path(os.environ.get("GOGN_OUTPUT_DIR", REPO_ROOT)).expanduser().resolve(),'results', 'acoustic', f'final_objective25.csv'), 'w') as csvfile:
   writer = csv.writer(csvfile)
   for row in final_objective25:
     writer.writerow(row)
 
-with open(os.path.join(os.getcwd(),'results', 'acoustic', f'best_error25.csv'), 'w') as csvfile:
+with open(os.path.join(Path(os.environ.get("GOGN_OUTPUT_DIR", REPO_ROOT)).expanduser().resolve(),'results', 'acoustic', f'best_error25.csv'), 'w') as csvfile:
   writer = csv.writer(csvfile)
   for row in best_error25:
     writer.writerow(row)

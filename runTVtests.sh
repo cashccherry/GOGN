@@ -1,8 +1,12 @@
-for coverage in bad good bad25 good25; do
+#!/usr/bin/env bash
+# Run from any working directory after activating the gogn environment.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+export MPLBACKEND="${MPLBACKEND:-Agg}"
+PYTHON="${PYTHON:-python}"
+for coverage in good bad good25 bad25; do
   for sigma in 1e-2 1e-1 1; do
-    mkdir figures/acousticTV/$coverage
-    mkdir figures/acousticTV/$coverage/$sigma
-    python tests/SFGN-TV-test.py $coverage $sigma
-    python tests/plot-SFGN-TV-test.py $coverage $sigma
+    "$PYTHON" tests/GOGN-TV-test.py "$coverage" "$sigma"
+    "$PYTHON" tests/plot-GOGN-TV-test.py "$coverage" "$sigma"
   done
-done 
+done

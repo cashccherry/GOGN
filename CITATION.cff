@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "Please cite the accompanying manuscript when using this research code."
+title: "GOGN: acoustic full-waveform inversion experiments"
+type: software
+version: 0.1.0
+authors:
+  - family-names: Cherry
+    given-names: Cash
+  - family-names: Wu Fung
+    given-names: Samy
+  - family-names: Tenorio
+    given-names: Luis
+  - family-names: Bozdağ
+    given-names: Ebru
+preferred-citation:
+  type: article
+  title: "A Gauss–Newton Method with No Additional PDE Solves Beyond Gradient Evaluation for Large-Scale PDE-Constrained Inverse Problems"
+  authors:
+    - family-names: Cherry
+      given-names: Cash
+    - family-names: Wu Fung
+      given-names: Samy
+    - family-names: Tenorio
+      given-names: Luis
+    - family-names: Bozdağ
+      given-names: Ebru
+  year: 2026

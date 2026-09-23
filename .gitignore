@@ -1,0 +1,22 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+*.log
+/results/
+/figures/
+/figures 2/
+/D2*.pt
+/output/
+/paper/
+*.zip
+*.aux
+*.out
+*.synctex.gz
+
+/smoke.json
+/GNFWI draft.pdf
+/rebuttal.pdf

@@ -1,41 +1,12 @@
-#python tests/SFGN-test.py good1
-#python tests/SFGN-test.py good5
-#python tests/SFGN-test.py good10
-#python tests/SFGN-test.py good25
-#python tests/SFGN-test.py good50
-
-# # python tests/SFGN-test.py good 1e-2
-# # python tests/SFGN-test.py good 1e-1
-# # python tests/SFGN-test.py good 1
-# # python tests/SFGN-test.py good 10
-
-python tests/SFGN-test.py good25 1e-2
-#python tests/SFGN-test.py good25 1e-1
-python tests/SFGN-test.py good25 1
-#python tests/SFGN-test.py good25 10
-##python tests/SFGN-test.py gooda25 1e-2
-##python tests/SFGN-test.py gooda25 1e-1
-##python tests/SFGN-test.py gooda25 1
-##python tests/SFGN-test.py gooda25 10
-#
-
-#python tests/SFGN-test.py bad1
-#python tests/SFGN-test.py bad5
-#python tests/SFGN-test.py bad10
-#python tests/SFGN-test.py bad25
-#python tests/SFGN-test.py bad50
-# # python tests/SFGN-test.py bad 1e-2
-# # python tests/SFGN-test.py bad 1e-1
-# # python tests/SFGN-test.py bad 1
-# # python tests/SFGN-test.py bad 10
-
-python tests/SFGN-test.py bad25 1e-2
-#python tests/SFGN-test.py bad25 1e-1
-python tests/SFGN-test.py bad25 1
-#python tests/SFGN-test.py bad25 10
-##python tests/SFGN-test.py bada25 1e-2
-##python tests/SFGN-test.py bada25 1e-1
-##python tests/SFGN-test.py bada25 1
-##python tests/SFGN-test.py bada25 10
-#
-
+#!/usr/bin/env bash
+# Run from any working directory after activating the gogn environment.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+export MPLBACKEND="${MPLBACKEND:-Agg}"
+PYTHON="${PYTHON:-python}"
+for coverage in good bad good25 bad25; do
+  for sigma in 1e-2 1e-1 1; do
+    "$PYTHON" tests/GOGN-test.py "$coverage" "$sigma"
+    "$PYTHON" tests/plot-GOGN-test.py "$coverage" "$sigma"
+  done
+done

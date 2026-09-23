@@ -1,12 +1,20 @@
+"""Historical geometry generator; not needed to run experiments.
+
+Uses the original seed and draw order. Existing directories deliberately cause
+an error to avoid overwriting authoritative acquisition arrays.
+"""
 import os
 import sys
+from pathlib import Path
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 import torch
 import numpy as np
 
-from sfgn.objectives.FWI import *
-from sfgn.optimization.utils import line_search_interpolate, line_search_backtrack
-from sfgn.optimization.nonlinear import *
+from gogn.objectives.FWI import *
+from gogn.optimization.utils import line_search_interpolate, line_search_backtrack
+from gogn.optimization.nonlinear import *
 
 np.random.seed(1260)
 

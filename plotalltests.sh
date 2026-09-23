@@ -1,81 +1,12 @@
-#mkdir figures/acoustic/good1
-#python tests/plot-SFGN-test.py good1
-#mkdir figures/acoustic/good5
-#python tests/plot-SFGN-test.py good5
-#mkdir figures/acoustic/good10
-#python tests/plot-SFGN-test.py good10
-#mkdir figures/acoustic/good25
-#python tests/plot-SFGN-test.py good25
-#mkdir figures/acoustic/good50
-#python tests/plot-SFGN-test.py good50
-
-mkdir figures/acoustic/good/1e-2
-python tests/plot-SFGN-test.py good 1e-2
-mkdir figures/acoustic/good/1e-1
-python tests/plot-SFGN-test.py good 1e-1
-mkdir figures/acoustic/good/1
-python tests/plot-SFGN-test.py good 1
-mkdir figures/acoustic/good/10
-python tests/plot-SFGN-test.py good 10
-
-mkdir figures/acoustic/good25/1e-2
-python tests/plot-SFGN-test.py good25 1e-2
-mkdir figures/acoustic/good25/1e-1
-python tests/plot-SFGN-test.py good25 1e-1
-mkdir figures/acoustic/good25/1
-python tests/plot-SFGN-test.py good25 1
-mkdir figures/acoustic/good25/10
-python tests/plot-SFGN-test.py good25 10
-
-##mkdir figures/acoustic/gooda25/1e-2
-##python tests/plot-SFGN-test.py gooda25 1e-2
-##mkdir figures/acoustic/gooda25/1e-1
-##python tests/plot-SFGN-test.py gooda25 1e-1
-##mkdir figures/acoustic/gooda25/1
-##python tests/plot-SFGN-test.py gooda25 1
-##mkdir figures/acoustic/gooda25/10
-##python tests/plot-SFGN-test.py gooda25 10
-#mkdir figures/acoustic/good/100
-#python tests/plot-SFGN-test.py good 100
-
-#mkdir figures/acoustic/bad1
-#python tests/plot-SFGN-test.py bad1
-#mkdir figures/acoustic/bad5
-#python tests/plot-SFGN-test.py bad5
-#mkdir figures/acoustic/bad10
-#python tests/plot-SFGN-test.py bad10
-#mkdir figures/acoustic/bad25
-#python tests/plot-SFGN-test.py bad25
-#mkdir figures/acoustic/bad50
-#python tests/plot-SFGN-test.py bad50
-
-mkdir figures/acoustic/bad/1e-2
-python tests/plot-SFGN-test.py bad 1e-2
-mkdir figures/acoustic/bad/1e-1
-python tests/plot-SFGN-test.py bad 1e-1
-mkdir figures/acoustic/bad/1
-python tests/plot-SFGN-test.py bad 1
-mkdir figures/acoustic/bad/10
-python tests/plot-SFGN-test.py bad 10
-
-mkdir figures/acoustic/bad25/1e-2
-python tests/plot-SFGN-test.py bad25 1e-2
-mkdir figures/acoustic/bad25/1e-1
-python tests/plot-SFGN-test.py bad25 1e-1
-mkdir figures/acoustic/bad25/1
-python tests/plot-SFGN-test.py bad25 1
-mkdir figures/acoustic/bad25/10
-python tests/plot-SFGN-test.py bad25 10
-
-#mkdir figures/acoustic/bada25/1e-2
-#python tests/plot-SFGN-test.py bada25 1e-2
-#mkdir figures/acoustic/bada25/1e-1
-#python tests/plot-SFGN-test.py bada25 1e-1
-#mkdir figures/acoustic/bada25/1
-#python tests/plot-SFGN-test.py bada25 1
-#mkdir figures/acoustic/bada25/10
-#python tests/plot-SFGN-test.py bada25 10
-#mkdir figures/acoustic/bad/100
-#python tests/plot-SFGN-test.py bad 100
-
-
+#!/usr/bin/env bash
+# Run from any working directory after activating the gogn environment.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+export MPLBACKEND="${MPLBACKEND:-Agg}"
+PYTHON="${PYTHON:-python}"
+# Plot the main waveform cases from already computed results.
+for coverage in good bad good25 bad25; do
+  for sigma in 1e-2 1e-1 1; do
+    "$PYTHON" tests/plot-GOGN-test.py "$coverage" "$sigma"
+  done
+done
