@@ -20,7 +20,7 @@ points, and optimizer behavior on reduced examples.
 
 ## Installation
 
-Create a separate environment; the existing `sfgn` environment is not modified:
+Create a separate environment;
 
 ```bash
 conda env create -f environment.yml
