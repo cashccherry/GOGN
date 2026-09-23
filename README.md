@@ -3,7 +3,6 @@
 Research code accompanying **A Gauss–Newton Method with No Additional PDE Solves
 Beyond Gradient Evaluation for Large-Scale PDE-Constrained Inverse Problems**,
 by Cash Cherry, Samy Wu Fung, Luis Tenorio, and Ebru Bozdağ (2026).
-The supplied manuscript is `2026_GNFWI_New.pdf`.
 
 The repository compares nonlinear conjugate gradient (NLCG), L-BFGS,
 gradient-only Gauss–Newton (GOGN), and Gauss–Newton with inner CG (GN-CG) on
