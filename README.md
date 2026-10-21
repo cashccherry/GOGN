@@ -6,9 +6,7 @@ by Cash Cherry, Samy Wu Fung, Luis Tenorio, and Ebru Bozdağ (2026).
 
 The repository compares nonlinear conjugate gradient (NLCG), L-BFGS,
 gradient-only Gauss–Newton (GOGN), and Gauss–Newton with inner CG (GN-CG) on
-2D Deepwave acoustic inversions. It retains the original script workflow,
-geometry weighting, filtering, smoothing, diagonal preconditioning, quadratic
-and smoothed total-variation regularization, and cost-history output.
+2D Deepwave acoustic inversions.
 
 **Reproduction status:** this repository contains the source code, packaged
 acquisition arrays, experiment scripts, plotting scripts, environment file, and
@@ -32,9 +30,7 @@ The environment specifies Python 3.11, PyTorch 2.6.0, torchvision 0.21.0,
 **stock Deepwave 0.0.20**, NumPy 2.3.0, SciPy 1.16.0, Matplotlib 3.10.3,
 psutil, and test dependencies. It omits machine-specific conda build hashes.
 PyTorch/torchvision must be a matching pair. The supplied scripts run on CPU;
-GPU execution is not configured or validated here. There is no dependency on
-the locally patched Deepwave used by the separate illumination-map project.
-That unrelated helper was removed. No external model download is needed.
+GPU execution is not configured or validated here. No external model download is needed.
 
 ## Small checks
 
@@ -55,7 +51,7 @@ in the independently evaluated objective for all four methods. Its geometry,
 frequency, time step, and small identity regularizer are deliberately different
 from the full paper cases. Regression tests cover finite-difference adjoints,
 TV derivatives, source gradients/counters, packaged inputs, and the original
-regularizer tests. The corrected GOGN gradient and TV direction are regression-tested; all 24 tests pass.
+regularizer tests. The GOGN gradient and TV direction are regression-tested; all 24 tests pass.
 `python tests/verify_diags.py` additionally checks the symbolic diagonal formula.
 To exercise the corrected non-diagonal inverse in an acoustic inversion:
 
@@ -65,8 +61,7 @@ MPLBACKEND=Agg python tests/smoke_inversion.py --regularizer tv --output output/
 python tests/diagnose_gogn.py  # algebraic examples of the former issues 2 and 3
 ```
 
-The smoothing variant uses a small Laplacian-plus-identity operator; it does not
-change the paper's default coefficients. Its plots are under
+The smoothing variant uses a small Laplacian-plus-identity operator. Its plots are under
 `output/smoke-smoothing/figures/smoke/`; TV plots are under
 `output/smoke-tv/figures/smoke/`. TV keeps the existing regularizer-solve settings;
 quadratic cases use q=m−m₀ without an extra solve.
@@ -83,8 +78,8 @@ quadratic cases use q=m−m₀ without an extra solve.
 - `tests/`: executable experiment/plotting scripts and small regression tests.
 - `results/`, `figures/`, `output/`: generated on demand and ignored by Git.
 
-The import/distribution name is now `gogn`, formerly `sfgn`. The optimizer
-function is `GOGN`, formerly `SFGN`. The historical output suffix `SFGN` is retained
+The import/distribution name is now `gogn`. The optimizer
+function is `GOGN`. The historical output suffix `SFGN` is retained
 so original result files can still be plotted; figures label it GOGN. Likewise
 `CG` means NLCG and `GNCG` means GN-CG. `acousticTT` and `acousticTV` remain intact.
 
