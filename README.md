@@ -28,7 +28,7 @@ python -c "import gogn, deepwave; import importlib.metadata as m; print(gogn.__f
 
 The environment specifies Python 3.11, PyTorch 2.6.0, torchvision 0.21.0,
 **stock Deepwave 0.0.20**, NumPy 2.3.0, SciPy 1.16.0, Matplotlib 3.10.3,
-psutil, and test dependencies. It omits machine-specific conda build hashes.
+Pillow 12.3.0, psutil, and test dependencies. It omits machine-specific conda build hashes.
 PyTorch/torchvision must be a matching pair. The supplied scripts run on CPU;
 GPU execution is not configured or validated here. No external model download is needed.
 
